@@ -56,8 +56,8 @@ FuelGauge fuel;
 
 Adafruit_BME280 bme;
 /* Screen obj */
-//Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+//Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 /* Particle Sensor obj */
 PMSA003 pm = PMSA003(); // create instance of class
 SdFat SD;

@@ -2,12 +2,13 @@
 //       THIS IS A GENERATED FILE - DO NOT EDIT       //
 /******************************************************/
 
-#line 1 "d:/Education/UW/Aerospec/Firmware/Particle-Boron-version/Offline-version/src/mvp-beta.ino"
-/* 
-  MVP Beta
-  04/21/2020
+#line 1 "d:/Education/UW/Aerospec/Firmware/Particle-Boron-version/Offline_version/src/mvp-beta.ino"
+/*
+ * Project Offline version
+ * Description: This firmware only do one thing. The raw data will be store in SD card 
+ * Author:Kai
+ * Date: 10/12/2022
  */
-
 
 
 #include "pmsa_i2c.h"
@@ -25,7 +26,7 @@ void displayInit();
 void ble_init();
 void write_to_ble(char *packet);
 void backUp2BLE(char *output);
-#line 16 "d:/Education/UW/Aerospec/Firmware/Particle-Boron-version/Offline-version/src/mvp-beta.ino"
+#line 17 "d:/Education/UW/Aerospec/Firmware/Particle-Boron-version/Offline_version/src/mvp-beta.ino"
 #define VERSION_R "V2.2.2"
 #define NAME_ADDR 10
 #define DUTY_SCR_ADDR 255
@@ -68,8 +69,8 @@ FuelGauge fuel;
 
 Adafruit_BME280 bme;
 /* Screen obj */
-//Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+//Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 /* Particle Sensor obj */
 PMSA003 pm = PMSA003(); // create instance of class
 SdFat SD;
@@ -881,8 +882,8 @@ void displayDATA(Sample* sample)
   epd.print("s    Disp: ");
   epd.print(SENSOR_CYCLE);
   epd.print("s    Pub: ");
-  epd.print(PUBLISH_RATE/3600);
-  epd.print("h");
+  //epd.print(PUBLISH_RATE/3600);
+  //epd.print("h");
 
   epd.display();
 
