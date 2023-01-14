@@ -191,7 +191,7 @@ bool checkRTC = true;
 int renameID(String name);
 int setDutyCycle(String duty);
 
-
+unsigned int counter = 0;
 
 
 void setup()
@@ -209,7 +209,7 @@ void setup()
 
   
   const uint8_t val = 0x01;
-  //dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, 1);
+//  dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, 1);
   
 
   Serial.begin(115200);
@@ -222,7 +222,7 @@ void setup()
   }
   delay(1000);  
   Wire.begin();
-  delay(1000);
+  delay(5000);
 
   
   if (!bme.begin()) {
@@ -249,7 +249,7 @@ void setup()
 //    EEPROM.get(DUTY_PUB_ADDR,PUBLISH_RATE);
 //  }
 //  else{
-    DISPLAY_REFRESH = 10;
+    DISPLAY_REFRESH = 60;
     SENSOR_CYCLE = 5;
     PUBLISH_RATE = 43200;
 //    EEPROM.put(DUTY_SCR_ADDR,DISPLAY_REFRESH);
@@ -294,10 +294,11 @@ void setup()
   // deviceID = String(ID);
 
   // Writes header to text file on SD card if the file doesn't exist. 
+  Serial.println("SD check");  
   if (!SD.exists(OUTPUTFILE)) {
-    char label[260];
-    sprintf(label, "%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s",
-    "Date","Time", "Battery", "Fix","Latitude","Longitude","Dp>0.3","Dp>0.5","Dp>1.0","Dp>2.5","Dp>5.0","Dp>10.0",
+    char label[265];
+    sprintf(label, "%10s,%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s",
+    "Counter","Date","Time", "Battery", "Fix","Latitude","Longitude","Dp>0.3","Dp>0.5","Dp>1.0","Dp>2.5","Dp>5.0","Dp>10.0",
     "PM1_Std","PM2.5_Std","PM10_Std","PM1_Env","PM2.5_Env","PM10_Env","Temp(C)","RH(%)","P(hPa)","Alti(m)");
     writeToFile(OUTPUTFILE,ID);
     delay(10);
@@ -316,14 +317,14 @@ void loop()
 {
 
   
-  if (!preSensorDutyMillis || !predisplayDutyMillis || !prePublishDutyMillis || !preTimeCheckMillis)
-  {
-    preSensorDutyMillis = millis();
-    predisplayDutyMillis = millis();
-    prePublishDutyMillis = millis();
-    preTimeCheckMillis = millis();
-    preConnectionTimeMillis = millis();
-  }
+//  if (!preSensorDutyMillis || !predisplayDutyMillis || !prePublishDutyMillis || !preTimeCheckMillis)
+//  {
+//    preSensorDutyMillis = millis();
+//    predisplayDutyMillis = millis();
+//    prePublishDutyMillis = millis();
+//    preTimeCheckMillis = millis();
+//    preConnectionTimeMillis = millis();
+//  }
 
   unsigned long curSensorDutyMillis = millis();
   unsigned long curDisplayDutyMillis = millis();
@@ -373,14 +374,14 @@ void loop()
     char sample_data[SAMPLE_CHAR_SIZE];
     sample_write(&latest_sample,sample_data);
     writeToFile(OUTPUTFILE, sample_data);
-    
+    counter +=1;
     // If past duty time, reset timer
     preSensorDutyMillis = curSensorDutyMillis;
   }
 
   // Task for displaying. SENSOR_CYCLE should be set either way. 
   if( (curDisplayDutyMillis - predisplayDutyMillis)  >= DISPLAY_REFRESH*1000){
-    take_sample();
+//    take_sample();
     displayDATA();
     predisplayDutyMillis = curDisplayDutyMillis;
   }  
@@ -391,7 +392,7 @@ void loop()
 void sample_write(Sample* sample, char *output){
 
   char timeData[20], pmData[150], posLatData[2], posLonData[2], fixData[2], dateData[20], batData[10], tempData[10], rhData[10], altData[10], pressData[10];
-
+  char counter_str[6];
   writePM(sample,pmData);
   sprintf(tempData, "%.2f",sample->temp_);
   sprintf(rhData, "%.2f",sample->humidity_);
@@ -403,8 +404,8 @@ void sample_write(Sample* sample, char *output){
   sprintf(posLonData,"%u",0);  // no GPS set to default 0
   sprintf(fixData,"%u",0);  // no GPS set to default 0
   sprintf(batData,"%.2f", sample->battery_);
-  
-  sprintf(output, "%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%5s,%5s,%5s", dateData, timeData, batData, fixData, posLatData, posLonData, pmData, tempData, rhData, pressData, altData);
+  String(counter).toCharArray(counter_str, 6);
+  sprintf(output, "%10s,%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%5s,%5s,%5s",counter_str, dateData, timeData, batData, fixData, posLatData, posLonData, pmData, tempData, rhData, pressData, altData);
 
 }
 
@@ -412,6 +413,7 @@ void writePM(Sample* sample, char* pmData) {
   char p03[6]; char p05[6]; char p10[6]; char p25[6]; char p50[6]; char p100[6];
   char pm10_std[6]; char pm25_std[6]; char pm100_std[6];
   char pm10_env[6]; char pm25_env[6]; char pm100_env[6];
+  
   String(sample->pt_03_).toCharArray(p03, 6);
   String(sample->pt_05_).toCharArray(p05, 6);
   String(sample->pt_10_).toCharArray(p10, 6);
@@ -581,17 +583,19 @@ void displayDATA()
   }
 
   //epd.setCursor(ORIGIN_X+mid_offset, 10);
-  epd.print(disMonth);
-  epd.print("/");
-  epd.print(disDay);
-  epd.print("/");
-  epd.print(disYear);
-  epd.print("  ");
-  epd.print(disHour);
-  epd.print(":");
-  epd.print(disMinute);
-  epd.print(":");
-  epd.print(disSecond);
+//  epd.print(disMonth);
+//  epd.print("/");
+//  epd.print(disDay);
+//  epd.print("/");
+//  epd.print(disYear);
+//  epd.print("  ");
+//  epd.print(disHour);
+//  epd.print(":");
+//  epd.print(disMinute);
+//  epd.print(":");
+//  epd.print(disSecond);
+  epd.print("counter: ");
+  epd.print(counter);
   
   epd.setCursor(ORIGIN_X, 20);
   epd.print("Battery: ");
@@ -656,9 +660,9 @@ void displayDATA()
 
   epd.setCursor(ORIGIN_X, 100);
   epd.print("Samp: ");
-  epd.print(DISPLAY_REFRESH);
-  epd.print("s    Disp: ");
   epd.print(SENSOR_CYCLE);
+  epd.print("s    Disp: ");
+  epd.print(DISPLAY_REFRESH);
   epd.print("s    Pub: ");
   //epd.print(PUBLISH_RATE/3600);
   //epd.print("h");

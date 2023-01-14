@@ -69,8 +69,8 @@ FuelGauge fuel;
 
 Adafruit_BME280 bme;
 /* Screen obj */
-Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-//Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+// Adafruit_IL0373 epd(212, 104, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
+Adafruit_SSD1675 epd(250,122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 /* Particle Sensor obj */
 PMSA003 pm = PMSA003(); // create instance of class
 SdFat SD;
@@ -236,7 +236,7 @@ int setPublishRate(String usr_input);
 
 // flag for counting number of transmitting data
 int count_flag = 0;
-
+unsigned int counter = 0;
 void setup()
 { 
 
@@ -245,7 +245,7 @@ void setup()
   pinMode(PP5V0_EN,OUTPUT);
   digitalWrite(PM_RST,HIGH);
   digitalWrite(PP5V0_EN,HIGH);
-
+  pinMode(LED_BUILTIN, OUTPUT);
 
 
  /* 
@@ -269,11 +269,11 @@ void setup()
 
 
   /* Currently fixing listening issue, look at again later */
-  Cellular.setActiveSim(INTERNAL_SIM);
-  Cellular.clearCredentials();
+  // Cellular.setActiveSim(INTERNAL_SIM);
+  // Cellular.clearCredentials();
 
   const uint8_t val = 0x01;
-  dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, 1);
+  // dct_write_app_data(&val, DCT_SETUP_DONE_OFFSET, 1);
   //Cellular.on();
   //Particle.connect();
   Cellular.off();
@@ -291,7 +291,8 @@ void setup()
   bme.begin();
   pm.begin();
   epd.begin();
-
+  // epd.setBlackBuffer(0,true);
+  // epd.setBlackBuffer(1,true);
   // Wait for a connection to the internet
   delay(5000);
 
@@ -340,7 +341,7 @@ void setup()
     EEPROM.put(DUTY_PUB_ADDR,PUBLISH_RATE);
   }
   */
-  DISPLAY_REFRESH = 10;
+  DISPLAY_REFRESH = 60;
   SENSOR_CYCLE = 5;
   PUBLISH_RATE = 43200;
   
@@ -353,7 +354,7 @@ void setup()
     default behavior is to dump the backup file to phone if the device turns on
     and it exists.  
   */
-  PHONE_BACKUP_REQUEST = true;
+  PHONE_BACKUP_REQUEST = false;
 
   // Splash Screen
   displayInit();  
@@ -366,14 +367,14 @@ void loop()
   SampleDestination samp_dest;
   //samp_dest = DEST_BACKUP_PHONE;
 
-  if (!preSensorDutyMillis || !predisplayDutyMillis || !prePublishDutyMillis || !preTimeCheckMillis )
-  {
-    preSensorDutyMillis = millis();
-    predisplayDutyMillis = millis();
-    prePublishDutyMillis = millis();
-    preTimeCheckMillis = millis();
-    preBackupSampleMillis = millis();
-  }
+  // if (!preSensorDutyMillis || !predisplayDutyMillis || !prePublishDutyMillis || !preTimeCheckMillis )
+  // {
+  //   preSensorDutyMillis = millis();
+  //   predisplayDutyMillis = millis();
+  //   prePublishDutyMillis = millis();
+  //   preTimeCheckMillis = millis();
+  //   preBackupSampleMillis = millis();
+  // }
 
   unsigned long curSensorDutyMillis = millis();
   unsigned long curDisplayDutyMillis = millis();
@@ -382,23 +383,29 @@ void loop()
   unsigned long curBackupSampleMillis = millis();
 
 
-  if (curTimeCheckMillis - Particle.timeSyncedLast() >= ONE_DAY_MILLIS && Particle.connected){
-    Particle.syncTime();
-    // Wait until the device receives time from Particle Device Cloud (or connection to Particle Device Cloud is lost)
-    // Will wait 10 seconds for the sync to be done. Blocking. 
-    waitFor(Particle.syncTimeDone,10000);
+  // if (curTimeCheckMillis - Particle.timeSyncedLast() >= ONE_DAY_MILLIS && Particle.connected){
+  //   Particle.syncTime();
+  //   // Wait until the device receives time from Particle Device Cloud (or connection to Particle Device Cloud is lost)
+  //   // Will wait 10 seconds for the sync to be done. Blocking. 
+  //   waitFor(Particle.syncTimeDone,10000);
 
-  }
+  // }
 
   
   if (curSensorDutyMillis - preSensorDutyMillis >= SENSOR_CYCLE*1000)
   {
         // Writes header to text file on SD card if the file doesn't exist.
-    samp_dest = DEST_SD;
+    
     take_sample(&latest_sample);
     SD_WRITE_SUCCESSFUL = false;
-    record_sample(samp_dest);
 
+    // samp_dest = DEST_SD;
+    // record_sample(samp_dest);
+    char data[SAMPLE_CHAR_SIZE];
+    sample_write(&latest_sample,data);
+    writeToFile(OUTPUTFILE, data);
+    counter +=1;
+    digitalWrite(LED_BUILTIN, counter&1);
     /*
     samp_dest  = DEST_BLE;
     record_sample(samp_dest);
@@ -419,6 +426,7 @@ void loop()
 
     // If past duty time, reset timer
     preSensorDutyMillis = curSensorDutyMillis;
+    
   }
 
   // Task for displaying. SENSOR_CYCLE should be set either way. 
@@ -499,9 +507,9 @@ void record_sample(SampleDestination dest){
 
       break;
 
-      case DEST_BACKUP_PHONE:
+    case DEST_BACKUP_PHONE:
       Serial.println("I am here2\n");
-        backUp2BLE(data);
+      backUp2BLE(data);
       break;
 
   }
@@ -571,7 +579,7 @@ void take_sample(Sample* latest){
 void sample_write(Sample* sample, char *output){
 
   char timeData[20], pmData[150], posLatData[2], posLonData[2], fixData[2], dateData[20], batData[10], tempData[10], rhData[10], altData[10], pressData[10];
-
+  char counter_str[6];
   writePM(sample,pmData);
   sprintf(tempData, "%.2f",sample->temp);
   sprintf(rhData, "%.2f",sample->humidity);
@@ -583,8 +591,8 @@ void sample_write(Sample* sample, char *output){
   sprintf(posLonData,"%u",0);  // no GPS set to default 0
   sprintf(fixData,"%u",0);  // no GPS set to default 0
   sprintf(batData,"%.2f", sample->battery);
-  
-  sprintf(output, "%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%5s,%5s,%5s", dateData, timeData, batData, fixData, posLatData, posLonData, pmData, tempData, rhData, pressData, altData);
+  String(counter).toCharArray(counter_str, 6);
+  sprintf(output, "%10s,%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%5s,%5s,%5s", counter_str, dateData, timeData, batData, fixData, posLatData, posLonData, pmData, tempData, rhData, pressData, altData);
 
 }
 
@@ -610,6 +618,7 @@ void writePM(Sample* sample, char* pmData) {
   String(sample->pm10_env).toCharArray(pm10_env, 6);
   String(sample->pm25_env).toCharArray(pm25_env, 6);
   String(sample->pm100_env).toCharArray(pm100_env, 6);
+  
   sprintf(pmData, "%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s", p03, p05, p10, p25, p50, p100, pm10_std, pm25_std, pm100_std, pm10_env, pm25_env, pm100_env);
 }
 
@@ -625,8 +634,8 @@ void writeToFile(String path, String content) {
     
     myFile = SD.open(path, FILE_WRITE);
 
-    sprintf(label, "%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s",
-    "Date","Time", "Battery", "Fix","Latitude","Longitude","Dp>0.3","Dp>0.5","Dp>1.0","Dp>2.5","Dp>5.0","Dp>10.0",
+    sprintf(label, "%10s,%10s,%10s,%10s,%5s,%15s,%15s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s,%10s",
+    "Counter","Date","Time", "Battery", "Fix","Latitude","Longitude","Dp>0.3","Dp>0.5","Dp>1.0","Dp>2.5","Dp>5.0","Dp>10.0",
     "PM1_Std","PM2.5_Std","PM10_Std","PM1_Env","PM2.5_Env","PM10_Env","Temp(C)","RH(%)","P(hPa)","Alti(m)");
     myFile.println(deviceID);
     myFile.println(label);
@@ -759,6 +768,7 @@ void displayInit(){
   epd.print("Device: ");
   epd.print(ID);
   epd.display();
+  
 }
 
 
@@ -766,8 +776,8 @@ void displayDATA(Sample* sample)
 {
 
   uint8_t mid_offset = 100;
-  CellularSignal sig = Cellular.RSSI();
-  float strength = sig.getStrength();
+  // CellularSignal sig = Cellular.RSSI();
+  float strength = 0.0;//sig.getStrength();
 
   char ID[ID_BUFF_SIZE];
   EEPROM.get(NAME_ADDR,ID);
@@ -781,6 +791,13 @@ void displayDATA(Sample* sample)
   int disDay = now_time.day();  
   int disMonth = now_time.month();  
   int disYear = now_time.year();
+
+  // int disHour = 0;  
+  // int disMinute  = 0; 
+  // int disSecond = 0;  
+  // int disDay = 0;  
+  // int disMonth = 0;  
+  // int disYear = 0;
 
   epd.setTextWrap(true);
   epd.setTextSize(1);
@@ -799,17 +816,20 @@ void displayDATA(Sample* sample)
   }
 
   //epd.setCursor(ORIGIN_X+mid_offset, 10);
-  epd.print(disMonth);
-  epd.print("/");
-  epd.print(disDay);
-  epd.print("/");
-  epd.print(disYear);
-  epd.print("  ");
-  epd.print(disHour);
-  epd.print(":");
-  epd.print(disMinute);
-  epd.print(":");
-  epd.print(disSecond);
+  // epd.print(disMonth);
+  // epd.print("/");
+  // epd.print(disDay);
+  // epd.print("/");
+  // epd.print(disYear);
+  // epd.print("  ");
+  // epd.print(disHour);
+  // epd.print(":");
+  // epd.print(disMinute);
+  // epd.print(":");
+  // epd.print(disSecond);
+  epd.print("counter: ");
+  epd.print(counter);
+
   
   epd.setCursor(ORIGIN_X, 20);
   epd.print("Batery: ");
@@ -878,14 +898,15 @@ void displayDATA(Sample* sample)
 
   epd.setCursor(ORIGIN_X, 100);
   epd.print("Samp: ");
-  epd.print(DISPLAY_REFRESH);
-  epd.print("s    Disp: ");
   epd.print(SENSOR_CYCLE);
+  epd.print("s    Disp: ");
+  epd.print(DISPLAY_REFRESH);
   epd.print("s    Pub: ");
   //epd.print(PUBLISH_RATE/3600);
   //epd.print("h");
 
   epd.display();
+  
 
 }
 
@@ -938,9 +959,9 @@ int setSampleRate(String usr_input){
       break;
   }
 
-  EEPROM.put(DUTY_SEN_ADDR,senDuty);
-  SENSOR_CYCLE = senDuty;
-
+  // EEPROM.put(DUTY_SEN_ADDR,senDuty);
+  // SENSOR_CYCLE = senDuty;
+  SENSOR_CYCLE = 5;
   return 0;
 
 }
@@ -985,7 +1006,7 @@ int setDisplayRate(String usr_input){
 
   EEPROM.put(DUTY_SEN_ADDR,scrDuty);
   DISPLAY_REFRESH = scrDuty;
-
+  DISPLAY_REFRESH = 10;
   return 0;
 
 }
